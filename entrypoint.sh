@@ -90,14 +90,19 @@ echo 'Waiting for X Socket' && until [ -S "/tmp/.X11-unix/X${DISPLAY#*:}" ]; do 
 # Resize the screen to the provided size
 /usr/local/bin/selkies-gstreamer-resize "${DISPLAY_SIZEW}x${DISPLAY_SIZEH}"
 
+# Determine which desktop environment to use based on WM_ONLY
+# false = startplasma-x11 - Full KDE desktop environment (defaut)
+# true  = kwin_x11 - Window Manager only, without any desktop environment, just to provide resize capability to applications.
+export DESKTOP_ENV_COMMAND=$([[ "${WM_ONLY}" == "true" ]] && echo "kwin_x11" || echo "startplasma-x11")
+
 # Use VirtualGL to run the KDE desktop environment with OpenGL if the GPU is available, otherwise use OpenGL with llvmpipe
 export XDG_SESSION_ID="${DISPLAY#*:}"
 export QT_LOGGING_RULES="${QT_LOGGING_RULES:-*.debug=false;qt.qpa.*=false}"
 if [ -n "$(nvidia-smi --query-gpu=uuid --format=csv,noheader | head -n1)" ] || [ -n "$(ls -A /dev/dri 2>/dev/null)" ]; then
   export VGL_FPS="${DISPLAY_REFRESH}"
-  /usr/bin/vglrun -d "${VGL_DISPLAY:-egl}" +wm /usr/bin/dbus-launch --exit-with-session /usr/bin/startplasma-x11 &
+  /usr/bin/vglrun -d "${VGL_DISPLAY:-egl}" +wm /usr/bin/dbus-launch --exit-with-session /usr/bin/${DESKTOP_ENV_COMMAND} &
 else
-  /usr/bin/dbus-launch --exit-with-session /usr/bin/startplasma-x11 &
+  /usr/bin/dbus-launch --exit-with-session /usr/bin/${DESKTOP_ENV_COMMAND} &
 fi
 
 # Start Fcitx input method framework
