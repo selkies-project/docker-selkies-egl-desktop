@@ -1,0 +1,53 @@
+#!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Session compositor for the Wayland backend: the Plasma session, nested inside
+# the capture compositor. The base's wayland service execs this with
+# WAYLAND_DISPLAY already naming the capture socket. Plasma starts its own
+# compositor (plasma_session runs kwin_wayland_wrapper), so the session cannot
+# be split from kwin the way the LXQt image splits its session from labwc:
+# kwin_wayland inherits the capture socket, comes up as its client with one
+# host window per screen and the XWayland server the session's X11
+# applications draw on, and the rest of the session moves onto kwin's own
+# socket. Screens are grown and removed at runtime as zkde_screencast virtual
+# outputs (KWIN_WAYLAND_NO_PERMISSION_CHECKS in the image environment keeps
+# that interface visible to Selkies; the kwin this image rebuilds registers
+# them -- see patches/).
+#
+# The session bus is the dbus-session service's fixed socket rather than one
+# launched per session: a shell attached to the container and the launcher
+# behind the dashboards' apps panel then reach the bus by address alone.
+export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/selkies-session-bus"
+until [ -S "${XDG_RUNTIME_DIR}/selkies-session-bus" ]; do sleep 0.5; done
+
+# kwin does not create the X11 socket directory itself (wlroots does), and
+# without it XWayland fails outright and every X11 application is lost. /tmp
+# is sticky, so the session user can create it; the setuid helper covers a
+# /tmp that something else already restricted.
+if [ ! -d /tmp/.X11-unix ]; then
+  # shellcheck disable=SC2174  # /tmp always exists, so -m applies to the leaf
+  mkdir -pm1777 /tmp/.X11-unix 2>/dev/null || sudo-root mkdir -pm1777 /tmp/.X11-unix \
+    || echo "[selkies-kwin] could not create /tmp/.X11-unix; X11 applications will not work"
+fi
+chmod 1777 /tmp/.X11-unix 2>/dev/null || true
+
+# Canonicalized the way the base entrypoint reads its toggles: the field before
+# any |suffix, "true" or "1" in any case.
+start_plasma="${START_PLASMA%%|*}"
+start_plasma="${start_plasma,,}"
+start_plasma="${start_plasma// /}"
+if [ -n "${start_plasma}" ] && [ "${start_plasma}" != "true" ] && [ "${start_plasma}" != "1" ]; then
+  # Only the compositor: windows are managed and X11 applications run, with no
+  # panel or desktop. The lock screen blocks a session only a disconnected
+  # stream would ever unlock.
+  echo "[selkies-kwin] START_PLASMA=${START_PLASMA}: running kwin_wayland without the Plasma shell"
+  exec kwin_wayland --xwayland --no-lockscreen
+fi
+
+# startplasma-wayland sets the session's own identity (XDG_CURRENT_DESKTOP,
+# KDE_SESSION_VERSION, DESKTOP_SESSION) and runs plasma_session without a lock
+# screen; XDG_SESSION_TYPE is what its kwin reads to pick the Wayland backend.
+export XDG_SESSION_TYPE="wayland"
+exec startplasma-wayland

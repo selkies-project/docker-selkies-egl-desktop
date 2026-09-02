@@ -1,8 +1,10 @@
 # docker-selkies-egl-desktop
 
-KDE Plasma Desktop container designed for Kubernetes, supporting OpenGL EGL and GLX, Vulkan, and Wine/Proton for NVIDIA GPUs through WebRTC and HTML5, providing an open-source remote cloud/HPC graphics or game streaming platform. Directly accesses the GPU without an X.Org X11 Server using EGL with [VirtualGL](https://github.com/VirtualGL/virtualgl) and Vulkan, not requiring `/tmp/.X11-unix` host sockets or host configuration.
+KDE Plasma desktop container for [Selkies](https://github.com/selkies-project/selkies), built on the [Selkies base container](https://github.com/selkies-project/selkies/tree/main/addons/base): a complete remote desktop streamed over WebSockets or WebRTC to a browser, with hardware acceleration on NVIDIA, AMD and Intel GPUs and a software fallback without one. The GPU is reached the way the base reaches it, through EGL and DRI3 with no X.Org server of its own, so one GPU can serve as many of these containers as it has memory for and no `/tmp/.X11-unix` host socket or host configuration is involved.
 
-Use [docker-selkies-glx-desktop](https://github.com/selkies-project/docker-selkies-glx-desktop) for a KDE Plasma Desktop container with better performance, having fully optimized OpenGL and Vulkan for NVIDIA GPUs by spawning its own fully isolated X.Org X11 Server, also not using `/tmp/.X11-unix` host sockets.
+Plasma runs on the base's X11 framebuffer server by default, and natively on the headless Wayland backend with `SELKIES_WAYLAND=true`, where a nested `kwin_wayland` is the session compositor. Both backends show a second display in a second browser window.
+
+Use [docker-selkies-glx-desktop](https://github.com/selkies-project/docker-selkies-glx-desktop) for the same desktop on an X.Org server that owns the GPU, which is what an application that needs the vendor's own GLX stack, or the last bit of OpenGL performance, wants; that image gives one GPU to one container.
 
 [![Build](https://github.com/selkies-project/docker-selkies-egl-desktop/actions/workflows/container-publish.yml/badge.svg)](https://github.com/selkies-project/docker-selkies-egl-desktop/actions/workflows/container-publish.yml)
 
@@ -10,31 +12,37 @@ Use [docker-selkies-glx-desktop](https://github.com/selkies-project/docker-selki
 
 **Please read [Troubleshooting](#troubleshooting) first, then use [Discord](https://discord.gg/wDNGDeSW5F) or [GitHub Discussions](https://github.com/selkies-project/docker-selkies-egl-desktop/discussions) for support questions. Please only use [Issues](https://github.com/selkies-project/docker-selkies-egl-desktop/issues) for technical inquiries or bug reports.**
 
+## What is in the image
+
+The [Selkies base container](https://github.com/selkies-project/selkies/blob/main/docs/component.md#desktop-container) supplies everything but the desktop: the display servers (a DRI3-capable Xvfb and the headless Wayland backend), PipeWire audio, the GPU runtime wiring for NVIDIA, VA-API and Vulkan, the gamepad and webcam plumbing, [s6](https://skarnet.org/software/s6/) service supervision, an embedded [coTURN](https://github.com/coturn/coturn) server for the WebRTC transport, and Selkies itself. This image adds KDE Plasma (`plasma-desktop` with Dolphin, Konsole, KWrite, Gwenview, Ark and System Settings), Firefox and Google Chrome, and the [proot-apps](https://github.com/linuxserver/proot-apps) runner behind the dashboard's apps panel, which installs portable applications into the home directory without touching the image.
+
+On the Wayland backend a second display is a kwin virtual output, which the distribution's kwin never registers on its nested backend, so the image rebuilds `kwin-wayland` from the Ubuntu source package with the patch under [`patches/`](patches/). The rebuilt packages are the archive's exact version, which is why the image is Ubuntu 26.04 only.
+
+OpenGL on NVIDIA GPUs runs through [Zink](https://docs.mesa3d.org/drivers/zink.html) on the NVIDIA Vulkan driver, in place of the VirtualGL the previous generation of this image translated GLX through: no interposer, no second X server, and the same path on both backends.
+
+Container tags are `26.04` for the current Ubuntu 26.04 build, `latest` for the same, and persistent tags of the form `26.04-20260101010101` for a specific build.
+
 ## Usage
-
-This container is composed fully of vendor-neutral applications and protocols except the NVIDIA userspace driver components, indicating that **there is nothing stopping you from using this container with GPUs of other vendors including AMD and Intel**. Use the container toolkit/runtime or Kubernetes device plugin of each respective vendor, or make sure that it provisions `/dev/dri/card[n]` and `/dev/dri/renderD[128 + n]` devices using `--device=/dev/dri:rwm` **with sufficient host user permissions for the devices (`sudo chmod -R -f 777 /dev/dri` from the host)**, then set the [environment variable `SELKIES_ENCODER`](https://github.com/selkies-project/selkies/blob/main/docs/component.md#encoders) to values including `vah264enc`, `x264enc`, `vp8enc`, or `vp9enc` if using the Selkies WebRTC interface. However, this is not officially supported and issues may arise. This container also supports running without any GPUs with software fallback (set the [environment variable `SELKIES_ENCODER`](https://github.com/selkies-project/selkies/blob/main/docs/component.md#encoders) to values including `x264enc`, `vp8enc`, or `vp9enc` if using the Selkies WebRTC interface).
-
-Container startup may take some time at first launch as it could automatically install NVIDIA driver libraries compatible with the host.
-
-For Windows applications or games, Wine, Winetricks, Lutris, Heroic Launcher, PlayOnLinux, and q4wine are bundled by default. Comment out the section where it is installed within `Dockerfile` if the user wants containers without Wine.
-
-The container requires host NVIDIA GPU driver versions of at least **450.80.02** and preferably **470.42.01** (the latest minor version in each major version), with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) to be also configured on the host for allocating GPUs. The latest minor versions (`xx` in `000.xx.00`) are strongly encouraged. All Maxwell or later generation GPUs in the consumer, professional, or datacenter lineups should not have significant issues running this container, although the Selkies high-performance NVENC backend may not be available. Kepler GPUs are untested and likely does not support the NVENC backend, but can be mostly functional using fallback software acceleration.
-
-The high-performance NVENC backend for the Selkies WebRTC interface is only supported in GPUs listed as supporting `H.264 (AVCHD)` under the `NVENC - Encoding` section of NVIDIA's [Video Encode and Decode GPU Support Matrix](https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new). If your GPU is not listed as supporting `H.264 (AVCHD)`, add the [environment variable `SELKIES_ENCODER`](https://github.com/selkies-project/selkies/blob/main/docs/component.md#encoders) to values including `x264enc`, `vp8enc`, or `vp9enc` in your container configuration for falling back to software acceleration, which also has a very good performance depending on your CPU.
-
-There are two web interfaces that may be chosen in this container, the first being the default [Selkies](https://github.com/selkies-project/selkies) WebRTC HTML5 web interface (requires a TURN server or host networking for best performance), and the second being the fallback [KasmVNC](https://github.com/kasmtech/KasmVNC) WebSocket HTML5 web interface. While the KasmVNC interface does not support audio forwarding, it can be useful for troubleshooting the Selkies WebRTC interface or using this container in constrained environments.
-
-The KasmVNC interface can be enabled in place of Selkies by setting `KASMVNC_ENABLE` to `true`. `KASMVNC_THREADS` sets the number of threads KasmVNC should use for frame encoding, defaulting to all threads if not set. When using the KasmVNC interface, environment variables `SELKIES_ENABLE_BASIC_AUTH`, `SELKIES_BASIC_AUTH_USER`, `SELKIES_BASIC_AUTH_PASSWORD`, `SELKIES_ENABLE_RESIZE`, `SELKIES_ENABLE_HTTPS`, `SELKIES_HTTPS_CERT`, `SELKIES_HTTPS_KEY`, `SELKIES_PORT`, `NGINX_PORT`, and `TURN_EXTERNAL_IP`, used with Selkies, are also inherited. As with the Selkies WebRTC interface, the KasmVNC interface username and password will also be set to the environment variables `SELKIES_BASIC_AUTH_USER` and `SELKIES_BASIC_AUTH_PASSWORD`, also using `ubuntu` and the environment variable `PASSWD` by default if not set.
 
 ### Running with Docker
 
-**1. Run the container with Docker, Podman, or other NVIDIA-supported container runtimes ([NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) required):**
+**1. Run the container with Docker or Podman.**
+
+With an NVIDIA GPU (the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) is required):
 
 ```bash
-docker run --name egl -it -d --gpus 1 --runtime nvidia --tmpfs /dev/shm:rw -e TZ=UTC -e DISPLAY_SIZEW=1920 -e DISPLAY_SIZEH=1080 -e DISPLAY_REFRESH=60 -e DISPLAY_DPI=96 -e DISPLAY_CDEPTH=24 -e PASSWD=mypasswd -e SELKIES_ENCODER=nvh264enc -e SELKIES_VIDEO_BITRATE=8000 -e SELKIES_FRAMERATE=60 -e SELKIES_AUDIO_BITRATE=128000 -e SELKIES_BASIC_AUTH_PASSWORD=mypasswd -p 8080:8080 ghcr.io/selkies-project/nvidia-egl-desktop:latest
+docker run --name egl -it -d --gpus 1 --shm-size=2g -e TZ=UTC -e PASSWD=mypasswd -p 8080:8080 ghcr.io/selkies-project/selkies-egl-desktop:26.04
 ```
 
-**Alternatively, use Docker Compose by editing the [`docker-compose.yml`](docker-compose.yml) file:**
+With an AMD or Intel GPU, pass the DRM devices in instead. The session user inside the container (uid 1000) must be able to open them, which `--group-add` covers when the host's `render` and `video` groups own the nodes:
+
+```bash
+docker run --name egl -it -d --device=/dev/dri:rwm --group-add="$(getent group render | cut -d: -f3)" --group-add="$(getent group video | cut -d: -f3)" --shm-size=2g -e TZ=UTC -e PASSWD=mypasswd -p 8080:8080 ghcr.io/selkies-project/selkies-egl-desktop:26.04
+```
+
+Without a GPU the same command minus the device options runs the desktop in software, with the x264 video encoder.
+
+**Alternatively, use Docker Compose by editing [`docker-compose.yml`](docker-compose.yml):**
 
 ```bash
 # Start the container from the path containing docker-compose.yml
@@ -43,361 +51,144 @@ docker compose up -d
 docker compose down
 ```
 
-**If the Selkies WebRTC HTML5 interface does not connect or is extremely slow, read Step 3 and the [WebRTC and Firewall Issues](#webrtc-and-firewall-issues) section very carefully.**
+`--shm-size=2g` matters because the browsers inside the desktop crash on Docker's 64 MB default. Replace `mypasswd` with your own password. The container must NOT be run in privileged mode.
 
-> NOTE: The container tags available are `latest` and `24.04` for Ubuntu 24.04, `22.04` for Ubuntu 22.04, and `20.04` for Ubuntu 20.04. [Persistent container tags](https://github.com/selkies-project/docker-selkies-egl-desktop/pkgs/container/nvidia-egl-desktop) are available in the form `24.04-20210101010101`. Replace all instances of `mypasswd` with your desired password. `SELKIES_BASIC_AUTH_PASSWORD` will default to `PASSWD` if unspecified. The container must NOT be run in privileged mode.
+**2. Connect to the web server on port 8080 with a browser.** You may also put a reverse proxy in front of it for external connectivity.
 
-**For [Apptainer](https://github.com/apptainer/apptainer)/[Singularity](https://github.com/sylabs/singularity) (requiring NVIDIA drivers):**
+The container serves HTTPS by default on a certificate it mints per install, so the browser warns once until you trust it or name a real certificate with `-e SELKIES_HTTPS_CERT=` and `-e SELKIES_HTTPS_KEY=`; `-e SELKIES_ENABLE_HTTPS=false` serves plain HTTP for a deployment that terminates TLS in front of the container.
 
-```bash
-# Customize paths
-export SINGULARITY_SELKIES_OVERLAY=~/my_mounting_point/nvidia-egl-desktop.sif
-export SINGULARITY_SELKIES_SCRATCH_HOME=~/nvidia-egl-desktop
-mkdir -pm755 "${SINGULARITY_SELKIES_SCRATCH_HOME}"
-# Change size of overlay storage
-singularity overlay create --sparse --size 1536 "${SINGULARITY_SELKIES_OVERLAY}"
-singularity instance run --overlay "${SINGULARITY_SELKIES_OVERLAY}" --nv --no-mount cwd --home "${SINGULARITY_SELKIES_SCRATCH_HOME}:/home/ubuntu" --env "TZ=UTC,DISPLAY_SIZEW=1920,DISPLAY_SIZEH=1080,DISPLAY_REFRESH=60,DISPLAY_DPI=96,DISPLAY_CDEPTH=24,PASSWD=mypasswd,SELKIES_ENCODER=nvh264enc,SELKIES_VIDEO_BITRATE=8000,SELKIES_FRAMERATE=60,SELKIES_AUDIO_BITRATE=128000,SELKIES_BASIC_AUTH_PASSWORD=mypasswd" docker://ghcr.io/selkies-project/nvidia-egl-desktop:latest egl
-```
+The login is `ubuntu` with the password from `PASSWD` (which is also the container's Linux user password) unless `SELKIES_BASIC_AUTH_USER` and `SELKIES_BASIC_AUTH_PASSWORD` name another one.
 
-Change `SELKIES_ENCODER` to `x264enc`, `vp8enc`, or `vp9enc` when using the Selkies interface if you are using software fallback without allocated GPUs or your GPU does not support `H.264 (AVCHD)` under the `NVENC - Encoding` section in NVIDIA's [Video Encode and Decode GPU Support Matrix](https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new).
-
-The environment variable `VGL_DISPLAY` can also be passed to the container, but only do so after you understand what it implicates with VirtualGL, valid values being either `egl[n]`, or `/dev/dri/card[n]` only when `--device=/dev/dri:rwm` was used for the container.
-
-**2. Connect to the web server with a browser on port 8080. You may also separately configure a reverse proxy to this port for external connectivity.**
-
-The default username is `ubuntu` for both the web authentication prompt and the container Linux username. The environment variable `PASSWD` (defaulting to `mypasswd`) is the password for the container Linux user account, and `SELKIES_BASIC_AUTH_PASSWORD` is the password for the HTML5 interface authentication prompt. If `SELKIES_ENABLE_BASIC_AUTH` is set to `true` for Selkies but `SELKIES_BASIC_AUTH_PASSWORD` is unspecified, the HTML5 interface password will default to `PASSWD`.
-
-> NOTE: Only one web browser can be connected at a time with the Selkies WebRTC interface. If the signaling connection works, but the WebRTC connection fails, read Step 3 and the [WebRTC and Firewall Issues](#webrtc-and-firewall-issues) section.
-
-Additional configurations and environment variables for the Selkies WebRTC HTML5 interface are listed in lines that start with `parser.add_argument` within the [Selkies Main Script](https://github.com/selkies-project/selkies/blob/master/src/selkies_gstreamer/__main__.py) or `selkies-gstreamer --help`.
-
-**3. (Not Applicable for KasmVNC) Read carefully if the Selkies WebRTC HTML5 interface does not connect or is extremely slow.**
-
-A [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server) is required because you are self-hosting WebRTC, unlike commercial services using WebRTC.
-
-Choose whether to use host networking, an internal [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server), or an external [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server).
-
-- **Internal TURN Server:**
-
-<details markdown>
-  <summary>Open Section</summary>
-
-There is an internal [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server) inside the container that may be used when an external [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server) or host networking is not available.
-
-Add environment variables `-e SELKIES_TURN_PROTOCOL=udp -e SELKIES_TURN_PORT=3478 -e TURN_MIN_PORT=65532 -e TURN_MAX_PORT=65535` (change the ports accordingly) with the `docker run` command (or uncomment the relevant [`docker-compose.yml`](docker-compose.yml) sections), where the `SELKIES_TURN_PORT` should not be used by any other host process or container, and the `TURN_MIN_PORT`/`TURN_MAX_PORT` port range has to contain at least two ports also not used by any other host process or container.
-
-Then, open the ports with the `docker run` arguments `-p 8080:8080 -p 3478:3478 -p 3478:3478/udp -p 65532-65535:65532-65535 -p 65532-65535:65532-65535/udp` (or uncomment the relevant [`docker-compose.yml`](docker-compose.yml) sections) in addition to the web server port.
-
-If UDP cannot be used, at the cost of higher latency and lower performance, omit the ports containing `/udp` and use the environment variable `-e SELKIES_TURN_PROTOCOL=tcp`.
-
-All these ports must be exposed to the internet if you need access over the internet. If you need use TURN within a local network, add `-e SELKIES_TURN_HOST={YOUR_INTERNAL_IP}` with `{YOUR_INTERNAL_IP}` to the internal hostname or IP of the local network. IPv6 addresses must be enclosed with square brackets such as `[::1]`.
-
-</details>
-
-- **Host Networking:**
-
-<details markdown>
-  <summary>Open Section</summary>
-
-The Selkies WebRTC HTML5 interface will likely just start working if you open UDP and TCP ports 49152–65535 in your host server network and add `--network=host` to the above `docker run` command, or `network_mode: 'host'` in `docker-compose.yml`. Note that running multiple desktop containers in one host under this configuration may be problematic and is not recommended. When deploying multiple containers, you must also pass new environment variables such as `-e DISPLAY=:22`, `-e NGINX_PORT=8082`, `-e SELKIES_PORT=8083`, and `-e SELKIES_METRICS_HTTP_PORT=9083` into the container, all not overlapping with any other X11 server or container in the same host. Access the container using the specified `NGINX_PORT`.
-
-However, host networking may be restricted or not be desired because of security reasons or when deploying multiple desktop containers in one host. If not available, check if the container starts working after omitting `--network=host`.
-
-</details>
-
-- **External TURN Server:**
-
-<details markdown>
-  <summary>Open Section</summary>
-
-If having no TURN server does not work, you need an external [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server). Read the [WebRTC and Firewall Issues](#webrtc-and-firewall-issues) section and add the environment variables `-e SELKIES_TURN_HOST=`, `-e SELKIES_TURN_PORT=`, and pick one of `-e SELKIES_TURN_SHARED_SECRET=` or both `-e SELKIES_TURN_USERNAME=` and `-e SELKIES_TURN_PASSWORD=` environment variables to the `docker run` command based on your authentication method.
-
-</details>
+**3. If the desktop loads but does not stream, or streams very slowly, read [WebRTC and Firewall Issues](#webrtc-and-firewall-issues).** The default WebSocket transport needs nothing but the web port. The WebRTC transport (`-e SELKIES_MODE=webrtc`) needs a TURN server or host networking, because you are self-hosting WebRTC.
 
 ### Running with Kubernetes
 
-**1. Create the Kubernetes `Secret` with your authentication password (change keys and values as adequate):**
+**1. Create the Kubernetes `Secret` with your password (change keys and values as adequate):**
 
 ```bash
 kubectl create secret generic my-pass --from-literal=my-pass=YOUR_PASSWORD
 ```
 
-> NOTE: Replace `YOUR_PASSWORD` with your desired password, and change the name `my-pass` to your preferred name of the Kubernetes secret with the `egl.yml` file changed accordingly as well. It is possible to skip the first step and directly provide the password with `value:` in `egl.yml`, but this exposes the password in plain text.
+> NOTE: Replace `YOUR_PASSWORD` with your desired password, and change the name `my-pass` to your preferred name of the Kubernetes secret with the `egl.yml` file changed accordingly as well. It is possible to skip this step and provide the password with `value:` in `egl.yml`, but this exposes the password in plain text.
 
-**2. Create the pod after editing the `egl.yml` file to your needs, explanations are available in the file:**
+**2. Create the pod after editing [`egl.yml`](egl.yml) to your needs; explanations are in the file:**
 
 ```bash
 kubectl create -f egl.yml
 ```
 
-**If the Selkies WebRTC HTML5 interface does not connect or is extremely slow, read Step 4 and the [WebRTC and Firewall Issues](#webrtc-and-firewall-issues) section very carefully.**
+The file requests an NVIDIA GPU through the NVIDIA device plugin. AMD and Intel GPUs are requested through their own device plugins (`amd.com/gpu`, `gpu.intel.com/i915`) in the same `resources:` section.
 
-> NOTE: The container tags available are `latest` and `24.04` for Ubuntu 24.04, `22.04` for Ubuntu 22.04, and `20.04` for Ubuntu 20.04. [Persistent container tags](https://github.com/selkies-project/docker-selkies-egl-desktop/pkgs/container/nvidia-egl-desktop) are available in the form `24.04-20210101010101`. `SELKIES_BASIC_AUTH_PASSWORD` will default to `PASSWD` if unspecified. The container must NOT be run in privileged mode.
+**3. Connect to the web server on port 8080** through the ingress or reverse proxy your cluster provides. The login is the same as with Docker.
 
-Change `SELKIES_ENCODER` to `x264enc`, `vp8enc`, or `vp9enc` when using the Selkies interface if you are using software fallback without allocated GPUs or your GPU does not support `H.264 (AVCHD)` under the `NVENC - Encoding` section in NVIDIA's [Video Encode and Decode GPU Support Matrix](https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new).
+**4. If the desktop loads but does not stream, read [WebRTC and Firewall Issues](#webrtc-and-firewall-issues).**
 
-**3. Connect to the web server spawned at port 8080. You may configure the ingress endpoint or reverse proxy that your Kubernetes cluster provides to this port for external connectivity.**
+## Configuration
 
-The default username is `ubuntu` for both the web authentication prompt and the container Linux username. The environment variable `PASSWD` (defaulting to `mypasswd`) is the password for the container Linux user account, and `SELKIES_BASIC_AUTH_PASSWORD` is the password for the HTML5 interface authentication prompt. If `SELKIES_ENABLE_BASIC_AUTH` is set to `true` for Selkies but `SELKIES_BASIC_AUTH_PASSWORD` is unspecified, the HTML5 interface password will default to `PASSWD`.
+Everything Selkies reads is an environment variable named in [`docs/settings.md`](https://github.com/selkies-project/selkies/blob/main/docs/settings.md) (`selkies --help` inside the container lists the same). The ones this image adds or that matter most:
 
-> NOTE: Only one web browser can be connected at a time with the Selkies WebRTC interface. If the signaling connection works, but the WebRTC connection fails, read Step 4 and the [WebRTC and Firewall Issues](#webrtc-and-firewall-issues) section.
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PASSWD` | `mypasswd` | Password of the container's Linux user, and of the web login unless `SELKIES_BASIC_AUTH_PASSWORD` is set |
+| `TZ` | `UTC` | Time zone |
+| `SELKIES_WAYLAND` | `false` | Run the desktop on the headless Wayland backend (nested kwin) instead of the X11 framebuffer server |
+| `SELKIES_MODE` | `websockets` | Transport: `websockets` or `webrtc`; both can be switched from the web interface |
+| `SELKIES_ENCODER` | `h264enc` | Video encoder: `h264enc` (hardware NVENC or VA-API when the GPU has it, x264 otherwise), `h264enc-striped`, or `jpeg` |
+| `SELKIES_VIDEO_BITRATE`, `SELKIES_FRAMERATE`, `SELKIES_AUDIO_BITRATE` | `8000`, `60`, `128000` | Initial stream parameters, adjustable from the web interface |
+| `SELKIES_ENABLE_HTTPS` | `true` | Serve TLS; `SELKIES_HTTPS_CERT` and `SELKIES_HTTPS_KEY` name a real certificate |
+| `SELKIES_ENABLE_BASIC_AUTH` | `true` | The web login, `ubuntu` and `PASSWD` unless `SELKIES_BASIC_AUTH_USER` and `SELKIES_BASIC_AUTH_PASSWORD` are set |
+| `SELKIES_SCALING_DPI` | `96` | The desktop's DPI, also adjustable from the web interface |
+| `SELKIES_AUTO_GPU` | `true` | Which GPU the session renders on when the container was given several |
+| `SELKIES_COMMAND_ENABLED` | `true` | The command channel behind the dashboard's apps panel; `false` disables it |
+| `START_PLASMA` | `true` | `false` runs only the display server (and, on the Wayland backend, only kwin) |
+| `SELKIES_KWIN_MULTI` | `true` | Second displays on the Wayland backend as kwin virtual outputs; this image ships the patched kwin they need |
 
-Additional configurations and environment variables for the Selkies WebRTC HTML5 interface are listed in lines that start with `parser.add_argument` within the [Selkies Main Script](https://github.com/selkies-project/selkies/blob/master/src/selkies_gstreamer/__main__.py) or `selkies-gstreamer --help`.
+The base container's own variables apply as well: `SELKIES_WAYLAND_COMPOSITOR` names the nested compositor (this image sets it to the Plasma session), `DISABLE_ZINK=true` leaves an NVIDIA GPU to software OpenGL instead of routing it through Zink, and the `SELKIES_TURN_*` variables configure the WebRTC transport.
 
-**4. (Not Applicable for KasmVNC) Read carefully if the Selkies WebRTC HTML5 interface does not connect or is extremely slow.**
+### Backends
 
-A [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server) is required because you are self-hosting WebRTC, unlike commercial services using WebRTC.
+On the default X11 backend the desktop draws on the base's Xvfb, a framebuffer server with DRI3 so OpenGL applications render on the GPU while the server itself composites in software; on NVIDIA GPUs OpenGL runs through Zink on the NVIDIA Vulkan driver. Plasma's own compositing is off in the system defaults (System Settings can turn it on), since every desktop animation is bandwidth for nothing on a stream.
 
-Choose whether to use host networking, an internal [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server), or an external [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server).
+With `SELKIES_WAYLAND=true` the whole session runs on Wayland: Selkies' own capture compositor owns the screens, and Plasma's `kwin_wayland` nests inside it, managing windows and running the XWayland server X11-only applications draw on. The compositor renders through GBM on the GPU's DRM render node. The NVIDIA Container Toolkit creates and exposes those nodes with `--gpus` from the release carrying its CDI device-node refresh; with an older toolkit, pass `--device=/dev/dri` and the host's `render` group (`--group-add`) as for AMD and Intel GPUs. Where the compositor cannot reach the GPU at all, the base falls back to the X11 backend so the session keeps it (`SELKIES_WAYLAND_X11_FALLBACK=false` keeps Wayland and composites in software).
 
-- **Internal TURN Server:**
+A second display is opened from the dashboard on either backend, in a second browser window. On Wayland each display is a screen of the capture compositor and kwin grows a matching virtual output for it, removed again when the display disconnects, with its windows returning to the primary; panels, maximized windows and the desktop are laid out per screen. On X11 each display is a RandR monitor on the framebuffer server's one output: the Plasma shell lays its panels and desktop out per monitor, but `kwin_x11` reads its screens from RandR CRTCs, of which that server has one, so a maximized window spans both displays there. A session that extends often is better run on the Wayland backend.
 
-<details markdown>
-  <summary>Open Section</summary>
+### Apps panel
 
-There is an internal [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server) inside the container that may be used when an external [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server) or host networking is not available.
-
-Uncomment the relevant environment variables `SELKIES_TURN_PROTOCOL=udp`, `SELKIES_TURN_PORT=3478`, `TURN_MIN_PORT=65532`, `TURN_MAX_PORT=65535` (change the ports accordingly) within `egl.yml` (within `name:` and `value:`), where the `SELKIES_TURN_PORT` should not be used by any other host process or container, and the `TURN_MIN_PORT`/`TURN_MAX_PORT` port range has to contain at least two ports also not used by any other host process or container. Then, open all of these ports in the Kubernetes configuration `ports:` section in addition to the web server port.
-
-If UDP cannot be used, at the cost of higher latency and lower performance, omit the UDP ports in the configuration and use the environment variable `SELKIES_TURN_PROTOCOL=tcp` (within `name:` and `value:`).
-
-All these ports must be exposed to the internet if you need access over the internet. If you need use TURN within a local network, add the environment variable `SELKIES_TURN_HOST={YOUR_INTERNAL_IP}` (within `name:` and `value:`) with `{YOUR_INTERNAL_IP}` to the internal hostname or IP of the local network. IPv6 addresses must be enclosed with square brackets such as `[::1]`.
-
-</details>
-
-- **Host Networking:**
-
-<details markdown>
-  <summary>Open Section</summary>
-
-Otherwise, the Selkies WebRTC HTML5 interface will likely just start working if you open UDP and TCP ports 49152–65535 in your host server network and uncomment `hostNetwork: true` in `egl.yml`. Note that running multiple desktop containers in one host under this configuration may be problematic and is not recommended. When deploying multiple containers with `hostNetwork: true`, you must also pass new environment variables such as `DISPLAY=:22`, `NGINX_PORT=8082`, `SELKIES_PORT=8083`, and `SELKIES_METRICS_HTTP_PORT=9083` into the container, all not overlapping with any other X11 server or container in the same host. Access the container using the specified `NGINX_PORT`.
-
-However, host networking may be restricted or not be desired because of security reasons or when deploying multiple desktop containers in one host. If not available, check if the container starts working after commenting out `hostNetwork: true`.
-
-</details>
-
-- **External TURN Server:**
-
-<details markdown>
-  <summary>Open Section</summary>
-
-If having no TURN server does not work, you need an external [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server). Read the [WebRTC and Firewall Issues](#webrtc-and-firewall-issues) section and fill in the environment variables `SELKIES_TURN_HOST` and `SELKIES_TURN_PORT`, then pick one of `SELKIES_TURN_SHARED_SECRET` or both `SELKIES_TURN_USERNAME` and `SELKIES_TURN_PASSWORD` environment variables, based on your authentication method.
-
-</details>
+The dashboard's apps panel installs applications from the [proot-apps](https://github.com/linuxserver/proot-apps) catalogue into the home directory. They persist with the home directory (mount a volume at `/home/ubuntu` to keep them) and never touch the image. `sudo apt-get install` works inside the session as well, through fakeroot, for packages the image should carry; `sudo-root` is the real thing, for device nodes and permissions only.
 
 ## WebRTC and Firewall Issues
 
-Note that this section is only required for the Selkies WebRTC HTML5 interface.
+This section applies only to the WebRTC transport (`SELKIES_MODE=webrtc`, or switching to it in the web interface); the default WebSocket transport needs only the web port.
 
-In most cases when either of your server or client has a permissive firewall, the default Google STUN server configuration will work without additional configuration. However, when connecting from networks that cannot be traversed with STUN, a TURN server is required.
+Self-hosted WebRTC needs a [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server) when the client and the container cannot reach each other directly, which is the case behind most NATs and firewalls, and always inside Docker's network isolation. Choose one of the following.
 
-**Read the last steps of each Docker/Kubernetes instruction to use an internal TURN server. Alternatively, read the below sections.**
+- **Internal TURN server:** the container runs its own coTURN when it has no external one. Publish its ports with `-p 3478:3478 -p 3478:3478/udp -p 65532-65535:65532-65535 -p 65532-65535:65532-65535/udp` (or uncomment them in `docker-compose.yml` / `egl.yml`) and set `-e TURN_MIN_PORT=65532 -e TURN_MAX_PORT=65535` to that range, which must contain at least two ports no other process uses. Set `-e SELKIES_TURN_HOST=` to the address clients reach the container on when it is not the public one, and `-e SELKIES_TURN_PROTOCOL=tcp` when UDP cannot be used, at the cost of latency.
 
-For an easy fix to when the signaling connection works, but the WebRTC connection fails, **open UDP and TCP ports 49152–65535 in your host server network** (or use Full Cone NAT in your network router/infrastructure settings), then add the option `--network=host` to your Docker command (or `network_mode: 'host'` in `docker-compose.yml`), or uncomment `hostNetwork: true` in your `egl.yml` file when using Kubernetes (note that your cluster may have not allowed this, resulting in an error). This exposes your container to the host network, which disables network isolation. Note that running multiple desktop containers in one host under this configuration may be problematic and is not recommended. You must also pass new environment variables such as `-e DISPLAY=:22`, `-e NGINX_PORT=8082`, `-e SELKIES_PORT=8083`, and `-e SELKIES_METRICS_HTTP_PORT=9083` into the container, all not overlapping with any other X11 server or container in the same host. Access the container using the specified `NGINX_PORT`.
+- **Host networking:** `--network=host` (or `network_mode: 'host'` / `hostNetwork: true`) with UDP and TCP ports 49152–65535 open in the host's firewall usually just works. Display `:20` must then be free on the host, and a second container needs its own `-e DISPLAY=:22 -e SELKIES_PORT=8082`; the cluster may not allow it.
 
-If this does not fix the connection issue (normally when the host is behind another additional firewall), you cannot use this fix for security or technical reasons, or when deploying multiple desktop containers in one host, read the below text to set up an external [TURN server](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server).
-
-### Deploying a TURN server
-
-**Read the instructions from [Selkies](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md#turn-server) if want to deploy an external TURN server or use a public TURN server instance. Read the last steps of each Docker/Kubernetes instruction to use an internal TURN server instead.**
-
-### Configuring with Docker
-
-More information is available in the [Selkies](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md) documentation.
-
-With Docker (or Podman), use the `-e` option to add the `SELKIES_TURN_HOST`, `SELKIES_TURN_PORT` environment variables. This is the hostname or IP and the port of the TURN server (3478 in most cases).
-
-You may set `SELKIES_TURN_PROTOCOL` to `tcp` if you are only able to open TCP ports for the coTURN container to the internet, or if the UDP protocol is blocked or throttled in your client network. You may also set `SELKIES_TURN_TLS` to `true` with the `-e` option if TURN over TLS/DTLS was properly configured with valid TLS certificates.
-
-You also require to provide either only the environment variable `SELKIES_TURN_SHARED_SECRET` for time-limited shared secret TURN authentication, or both the environment variables `SELKIES_TURN_USERNAME` and `SELKIES_TURN_PASSWORD` for legacy long-term TURN authentication, depending on your TURN server configuration. Provide just one of these authentication methods, not both.
-
-If there is a [TURN REST API](https://github.com/selkies-project/selkies/blob/main/docs/component.md#turn-rest) server, provide the environment variable `SELKIES_TURN_REST_URI` but not any other authentication credentials to the TURN REST URI within this infrastructure. If there is a shared TURN server within an infrastructure, consider reading the [TURN REST API](https://github.com/selkies-project/selkies/blob/main/docs/component.md#turn-rest) documentation or provide the link to your infrastructure administrator to deploy a TURN REST API server.
-
-### Configuring with Kubernetes
-
-More information is available in the [Selkies](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md) documentation.
-
-Your TURN server will use only one out of three ways to authenticate the client, so only provide one type of authentication method. The time-limited shared secret TURN authentication only requires the Base64 encoded `SELKIES_TURN_SHARED_SECRET`. The legacy long-term TURN authentication requires both `SELKIES_TURN_USERNAME` and `SELKIES_TURN_PASSWORD` credentials. The [TURN REST API](https://github.com/selkies-project/selkies/blob/main/docs/component.md#turn-rest) method only requires the `SELKIES_TURN_REST_URI` URI.
-
-#### TURN REST API
-
-If there is a shared TURN server within an infrastructure, consider reading the [TURN REST API](https://github.com/selkies-project/selkies/blob/main/docs/component.md#turn-rest) documentation or provide the link to your infrastructure administrator to deploy a TURN REST API server.
-
-<details markdown>
-  <summary>Open Section</summary>
-
-Then, uncomment the lines in the `egl.yml` file related to TURN server usage, updating the `SELKIES_TURN_REST_URI` environment variable as needed:
-
-```yaml
-- name: SELKIES_TURN_REST_URI
-  value: "https://turn-rest.myinfrastructure.io:8443/myturnrest"
-- name: SELKIES_TURN_PROTOCOL
-  value: "udp"
-- name: SELKIES_TURN_TLS
-  value: "false"
-```
-
-</details>
-
-#### Time-limited shared secret authentication
-
-<details markdown>
-  <summary>Open Section</summary>
-
-**1. Create a secret containing the TURN shared secret:**
-
-```bash
-kubectl create secret generic turn-shared-secret --from-literal=turn-shared-secret=MY_SELKIES_TURN_SHARED_SECRET
-```
-
-> NOTE: Replace `MY_SELKIES_TURN_SHARED_SECRET` with the shared secret of the TURN server, then changing the name `turn-shared-secret` to your preferred name of the Kubernetes secret, with the `egl.yml` file also being changed accordingly.
-
-**2. Uncomment the lines in the `egl.yml` file related to TURN server usage, updating the `SELKIES_TURN_HOST` and `SELKIES_TURN_PORT` environment variables as needed:**
-
-```yaml
-- name: SELKIES_TURN_HOST
-  value: "turn.example.com"
-- name: SELKIES_TURN_PORT
-  value: "3478"
-- name: SELKIES_TURN_SHARED_SECRET
-  valueFrom:
-    secretKeyRef:
-      name: turn-shared-secret
-      key: turn-shared-secret
-- name: SELKIES_TURN_PROTOCOL
-  value: "udp"
-- name: SELKIES_TURN_TLS
-  value: "false"
-```
-
-> NOTE: It is possible to skip the first step and directly provide the shared secret with `value:`, but this exposes the shared secret in plain text. Set `SELKIES_TURN_PROTOCOL` to `tcp` if you were able to only open TCP ports while creating your own coTURN Deployment/DaemonSet, or if your client network throttles or blocks the UDP protocol at the cost of higher latency and lower performance.
-
-</details>
-
-#### Legacy long-term authentication
-
-<details markdown>
-  <summary>Open Section</summary>
-
-**1. Create a secret containing the TURN password:**
-
-```bash
-kubectl create secret generic turn-password --from-literal=turn-password=MY_SELKIES_TURN_PASSWORD
-```
-
-> NOTE: Replace `MY_SELKIES_TURN_PASSWORD` with the password of the TURN server, then changing the name `turn-password` to your preferred name of the Kubernetes secret, with the `egl.yml` file also being changed accordingly.
-
-**2. Uncomment the lines in the `egl.yml` file related to TURN server usage, updating the `SELKIES_TURN_HOST`, `SELKIES_TURN_PORT`, and `SELKIES_TURN_USERNAME` environment variables as needed:**
-
-```yaml
-- name: SELKIES_TURN_HOST
-  value: "turn.example.com"
-- name: SELKIES_TURN_PORT
-  value: "3478"
-- name: SELKIES_TURN_USERNAME
-  value: "username"
-- name: SELKIES_TURN_PASSWORD
-  valueFrom:
-    secretKeyRef:
-      name: turn-password
-      key: turn-password
-- name: SELKIES_TURN_PROTOCOL
-  value: "udp"
-- name: SELKIES_TURN_TLS
-  value: "false"
-```
-
-> NOTE: It is possible to skip the first step and directly provide the TURN password with `value:`, but this exposes the TURN password in plain text. Set `SELKIES_TURN_PROTOCOL` to `tcp` if you were able to only open TCP ports while creating your own coTURN Deployment/DaemonSet, or if your client network throttles or blocks the UDP protocol at the cost of higher latency and lower performance.
-
-</details>
+- **External TURN server:** set `SELKIES_TURN_HOST` and `SELKIES_TURN_PORT`, then either `SELKIES_TURN_SHARED_SECRET` (time-limited shared secret authentication) or both `SELKIES_TURN_USERNAME` and `SELKIES_TURN_PASSWORD` (long-term credentials), never both methods at once. `SELKIES_TURN_PROTOCOL=tcp` when UDP is blocked; `SELKIES_TURN_TLS=true` when the TURN server has a valid certificate. A [TURN REST API](https://github.com/selkies-project/selkies/blob/main/docs/component.md#turn-rest) is named with `SELKIES_TURN_REST_URI` alone. The Selkies [firewall documentation](https://github.com/selkies-project/selkies/blob/main/docs/firewall.md) covers deploying one; with Kubernetes, keep the credentials in a `Secret` the way `egl.yml` shows.
 
 ## Troubleshooting
 
-### I have an issue related to the Selkies WebRTC HTML5 interface.
+### The container does not work with an NVIDIA GPU.
 
-**[Link](https://github.com/selkies-project/selkies/blob/main/docs/README.md)**
+<details markdown>
+  <summary>Open Answer</summary>
+
+Check that the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) is configured on the host and the container was started with `--gpus`, that the host driver is not the `nvidia-headless` variant (it lacks the graphics libraries), and that `NVIDIA_DRIVER_CAPABILITIES` inside the container is `all` or includes `graphics` (OpenGL, Vulkan), `video` (NVENC) and `compute`. Vulkan needs `display` as well. `nvidia-smi` and `vulkaninfo --summary` inside the container show what the driver exposes; the container's log names the GPU the session renders on and why it fell back if it did.
+
+</details>
+
+### The container does not work with an AMD or Intel GPU.
+
+<details markdown>
+  <summary>Open Answer</summary>
+
+The container needs `/dev/dri` (`--device=/dev/dri:rwm`) and the session user must be able to open the nodes: add the host's `render` and `video` groups with `--group-add`, or as a last resort `sudo chmod -R 777 /dev/dri` on the host. `vainfo` and `vulkaninfo --summary` inside the container show the driver; the container's log names the render node the session picked, and `SELKIES_AUTO_GPU` or `SELKIES_RENDER_DRI` selects another.
+
+</details>
+
+### The browser inside the desktop, or another application, crashes at once.
+
+<details markdown>
+  <summary>Open Answer</summary>
+
+Give the container more shared memory: `--shm-size=2g`, or the `/dev/shm` memory-backed `emptyDir` `egl.yml` mounts. Applications that bring their own sandbox (Chrome, Electron, AppImages) run inside the container's own sandboxing: Chrome is already started with its sandbox arrangements, Electron applications take `--no-sandbox`, and AppImages are extracted rather than FUSE-mounted (`APPIMAGE_EXTRACT_AND_RUN` is set). Do not use `systemd`, Flatpak or Snap inside the container; they need privileges a container should not have.
+
+</details>
+
+### OpenGL or Vulkan does not work for an application.
+
+<details markdown>
+  <summary>Open Answer</summary>
+
+`glxinfo -B` and `vulkaninfo --summary` inside the session show which driver answers. On NVIDIA GPUs OpenGL runs through Zink on the Vulkan driver here, because no X.Org server offers the vendor's GLX; an application that needs the NVIDIA GLX stack itself belongs on [docker-selkies-glx-desktop](https://github.com/selkies-project/docker-selkies-glx-desktop). `DISABLE_ZINK=true` leaves the GPU to software OpenGL for an application Zink cannot run.
+
+</details>
+
+### I want to use a specific GPU when the container has several.
+
+<details markdown>
+  <summary>Open Answer</summary>
+
+`--gpus '"device=1,2"'` gives the container the NVIDIA GPUs with device IDs 1 and 2 (`--gpus 1` means any single GPU). Among the GPUs the container was given, `SELKIES_AUTO_GPU` picks the one the session renders on and `SELKIES_ENCODE_DRI` the one the video encoder uses; the container's log names the choice.
+
+</details>
 
 ### I want to customize this container.
 
-**[Link](https://github.com/selkies-project/selkies/blob/main/docs/development.md)**
+Build on it the way [`docs/development.md`](https://github.com/selkies-project/selkies/blob/main/docs/development.md#container-customization) describes: use this image as the base and replace or add s6 service files under `/etc/service/`. Every service here is one `run` script: `plasma` (the X11 session), `dbus-session` (the session bus), and the base's own. The Wayland session runs under the base's `wayland` service, through `selkies-kwin`.
 
-### I want to use the keyboard layout of my own language.
+## Building
 
-<details markdown>
-  <summary>Open Answer</summary>
-
-Run `Input Method: Configure Input Method` from the start menu, uncheck `Only Show Current Language`, search and add from available input methods (Hangul, Mozc, Pinyin, and others) by moving to the right, then use `Ctrl + Space` to switch between the input methods. Raise an issue if you need more layouts.
-
-</details>
-
-### The container does not work.
-
-<details markdown>
-  <summary>Open Answer</summary>
-
-Check that the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) is properly configured in the host. Next, check that your host NVIDIA GPU driver is not the `nvidia-headless` variant, which lacks the required display and graphics capabilities for this container.
-
-After that, check the environment variable `NVIDIA_DRIVER_CAPABILITIES` after starting a shell interface inside the container. `NVIDIA_DRIVER_CAPABILITIES` should be set to `all`, or include a comma-separated list of `compute` (requirement for CUDA and OpenCL, or for the [Selkies](https://github.com/selkies-project/selkies) WebRTC remote desktop interface), `utility` (requirement for `nvidia-smi` and NVML), `graphics` (requirement for OpenGL and part of the requirement for Vulkan), `video` (required for encoding or decoding videos using NVIDIA GPUs, or for the [Selkies](https://github.com/selkies-project/selkies) WebRTC remote desktop interface), `display` (the other requirement for Vulkan), and optionally `compat32` if you use Wine or 32-bit graphics applications.
-
-Moreover, if you are using custom configurations, check if your shared memory path `/dev/shm` has sufficient capacity, where expanding the capacity is done by adding `--tmpfs /dev/shm:rw` to your Docker command or adding the below lines to your Kubernetes configuration file.
-
-```yaml
-spec:
-  template:
-    spec:
-      containers:
-        volumeMounts:
-        - mountPath: /dev/shm
-          name: dshm
-      volumes:
-      - name: dshm
-        emptyDir:
-          medium: Memory
+```bash
+docker build -t selkies-egl-desktop --build-arg BASE_IMAGE=ghcr.io/selkies-project/selkies/base:main-ubuntu26.04 .
 ```
 
-If you checked everything here, scroll down.
-
-</details>
-
-### I want to use `systemd`, `polkit`, FUSE mounts, or sandboxed (containerized) application distribution systems like Flatpak, Snapcraft (snap), AppImage, Electron, chrome-sandbox, etc.
-
-<details markdown>
-  <summary>Open Answer</summary>
-
-**Use the option `--appimage-extract-and-run` or `--appimage-extract` with your AppImage to run them in a container. Alternatively, set `export APPIMAGE_EXTRACT_AND_RUN=1` to your current shell.**
-
-Do not use `systemd`, `polkit`, FUSE mounts, or sandboxed application distribution systems with containers. You can use them if you add unsafe capabilities to your containers, but it will break the isolation of the containers. This is especially bad if you are using Kubernetes. There will likely be an alternative way to install the applications instead of Snapcraft (snap) or Flatpak, including [Personal Package Archives](https://launchpad.net/ubuntu/+ppas). For some applications, there will be options to disable sandboxing when running or options to extract files before running. When applications using Chrome Sandbox (chrome-sandbox) or the [Electron](https://www.electronjs.org/) framework show related errors, use the `--no-sandbox` command-line option when running such applications.
-
-</details>
-
-### OpenGL does not work for certain applications.
-
-<details markdown>
-  <summary>Open Answer</summary>
-
-This is likely an issue with [VirtualGL](https://github.com/VirtualGL/virtualgl), which is used to translate GLX commands to EGL commands and use OpenGL without Xorg. Some applications, including research workloads, show this problem. This **cannot** be solved by raising an issue here or contacting me.
-
-First, check that the application works with [docker-selkies-glx-desktop](https://github.com/selkies-project/docker-selkies-glx-desktop) in the same host environment. If it works, it is indeed a problem associated with [VirtualGL](https://github.com/VirtualGL/virtualgl). If it does not, raise an issue here. Second, use the error messages found with verbose mode and search similar issues for your application. Third, if there are no similar issues, raise the issue to the repository or contact the maintainers. Fourth, if the maintainers request that it should be redirected to [VirtualGL](https://github.com/VirtualGL/virtualgl), raise an issue there after confirming [VirtualGL](https://github.com/VirtualGL/virtualgl) does not have similar issues raised. Note that in this case, you may have to wait for a new [VirtualGL](https://github.com/VirtualGL/virtualgl) release and for this repository to use the new release.
-
-</details>
-
-### Vulkan does not work.
-
-<details markdown>
-  <summary>Open Answer</summary>
-
-Make sure that the `NVIDIA_DRIVER_CAPABILITIES` environment variable is set to `all`, or includes both `graphics` and `display`. The `display` capability is especially crucial to Vulkan, but the container does start without noticeable issues other than Vulkan without `display`, despite its name. AMD and Intel GPUs are not tested and therefore Vulkan is not guaranteed to work. People are welcome to share their experiences, however.
-
-</details>
-
-### I want to use a specific GPU for OpenGL rendering when I have multiple GPUs in one container.
-
-<details markdown>
-  <summary>Open Answer</summary>
-
-Use the `VGL_DISPLAY` environment variable, but only do so after you understand what it implicates with [VirtualGL](https://github.com/VirtualGL/virtualgl). Valid values are either `egl[n]`, or `/dev/dri/card[n]` only when `--device=/dev/dri` was used for the container (`[n]` is the order of the GPUs, where simply `egl` without the number is the same as `egl0`). Note that `docker --gpus 1` means any single GPU, not the GPU device ID of 1. Use `docker --gpus '"device=1,2"'` to provision GPUs with device IDs 1 and 2 to the container.
-
-</details>
+`BASE_IMAGE` is any Ubuntu 26.04 Selkies base container, by tag or digest. The build rebuilds `kwin-wayland` from the archive source with the patch under `patches/`, which takes a while; `SELKIES_REF` names the Selkies revision the shared helper scripts are taken from (`main`).
 
 ---
 This project has been developed and is supported in part by the National Research Platform (NRP) and the Cognitive Hardware and Software Ecosystem Community Infrastructure (CHASE-CI) at the University of California, San Diego, by funding from the National Science Foundation (NSF), with awards #1730158, #1540112, #1541349, #1826967, #2138811, #2112167, #2100237, and #2120019, as well as additional funding from community partners, infrastructure utilization from the Open Science Grid Consortium, supported by the National Science Foundation (NSF) awards #1836650 and #2030508, and infrastructure utilization from the Chameleon testbed, supported by the National Science Foundation (NSF) awards #1419152, #1743354, and #2027170. This project has also been funded by the Seok-San Yonsei Medical Scientist Training Program (MSTP) Song Yong-Sang Scholarship, College of Medicine, Yonsei University, the MD-PhD/Medical Scientist Training Program (MSTP) through the Korea Health Industry Development Institute (KHIDI), funded by the Ministry of Health & Welfare, Republic of Korea, and the Student Research Bursary of Song-dang Institute for Cancer Research, College of Medicine, Yonsei University.
+
+<sub><sup>\* Funding agencies including, but not limited to the National Science Foundation, remain neutral with regard to jurisdictional claims in published articles and software code of this Code Repository. In the context including, but not limited to this Code Repository, as well as in the context including, but not limited to any and all derivative works based on this Code Repository, all trademarks, trade names, logos, patents, or any and all other forms of external intellectual property, that are mentioned or used, unless otherwise stated, are the property of their respective owners, including but not limited to, The Linux Foundation®, Linus Torvalds, The Apache Software Foundation, Canonical Ltd., Google LLC, Alphabet Inc., NumFOCUS Foundation, Anaconda Inc., conda-forge, Project Jupyter, Coder Technologies, Inc., Docker®, Inc., SchedMD LLC, NVIDIA Corporation, Intel Corporation, Advanced Micro Devices, Inc., Valve Corporation, Epic Games, Inc., Unity Software Inc., Cendio AB, RealVNC® Limited, Amazon.com, Inc., Amazon Web Services, Inc., or its affiliates including but not limited to NICE s.r.l. or NICE USA LLC, Microsoft Corporation, Cloudflare, Inc., Oracle Corporation, StarNet Communications Corporation, TeamViewer SE, Fabrice Bellard, Moonlight Project, and LizardByte. Every best effort has been undertaken to properly identify and attribute trademarks, trade names, logos, patents, or any and all other forms of external intellectual property to their respective owners, unless otherwise stated, wherever possible and practical. The inclusion of such trademarks, trade names, logos, patents, or any and all other forms of external intellectual property in association with this project, unless otherwise stated, serves solely for the purpose of description and must never be construed as an indication of affiliation, competition, endorsement, or a challenge to any and all legal standings of the trademarks, trade names, logos, patents, or any and all other forms of external intellectual property. All project contributors, maintainers, owners, or organizations agree to not willfully breach or infringe legal regulations, in any and all global law, regarding trademarks, trade names, logos, patents, or any and all other forms of external intellectual property. Therefore, all project contributors, maintainers, owners, or organizations, are immune to, and are not to be in any and all cases held legally liable for, any and all jurisdictional claims on trademarks, trade names, logos, patents, or any and all other forms of external intellectual property. No component of this Code Repository is an official product of Google LLC or Alphabet Inc.</sup></sub>
