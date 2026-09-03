@@ -117,7 +117,7 @@ Everything Selkies reads is an environment variable named in [`docs/settings.md`
 | `SELKIES_SCALING_DPI` | `96` | The desktop's DPI, also adjustable from the web interface |
 | `SELKIES_AUTO_GPU` | `true` | Which GPU the session renders on when the container was given several |
 | `SELKIES_COMMAND_ENABLED` | `true` | The command channel behind the dashboard's apps panel; `false` disables it |
-| `START_PLASMA` | `true` | `false` runs only the display server (and, on the Wayland backend, only kwin) |
+| `START_PLASMA` | `true` | `false` runs the display server with kwin alone, no Plasma shell: a single application started from the apps panel or an attached shell is managed, resized and maximized without a desktop around it |
 
 The base container's own variables apply as well: `SELKIES_WAYLAND_COMPOSITOR` names the nested compositor (this image sets it to the Plasma session), `DISABLE_ZINK=true` leaves an NVIDIA GPU to software OpenGL instead of routing it through Zink, and the `SELKIES_TURN_*` variables configure the WebRTC transport.
 

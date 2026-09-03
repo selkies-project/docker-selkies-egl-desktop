@@ -272,8 +272,8 @@ USER 1000
 # terminal, so the desktop image enables the channel; disable with
 # -e SELKIES_COMMAND_ENABLED=false.
 ENV SELKIES_COMMAND_ENABLED="true"
-# Start the Plasma session (set to false to run only the display server, or
-# only kwin on the Wayland backend)
+# Start the Plasma session; false runs the display server with kwin alone, no
+# shell, on either backend
 ENV START_PLASMA="true"
 # The Plasma session is the nested compositor the base's wayland service
 # starts: selkies-kwin runs startplasma-wayland, whose kwin_wayland nests
