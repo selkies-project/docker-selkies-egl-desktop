@@ -256,10 +256,8 @@ ENV START_PLASMA="true"
 ENV SELKIES_WAYLAND_COMPOSITOR="selkies-kwin"
 # Plasma's menu definitions carry its prefix; the base defaults to lxqt-
 ENV XDG_MENU_PREFIX="plasma-"
-# Second displays on the Wayland backend are kwin virtual outputs, and the two
-# halves of that travel together: the interface stays visible to Selkies (kwin
-# hides it from clients without an X-KDE-Wayland-Interfaces desktop entry, a
-# check a python process can never satisfy), and the capability is declared
-# because this image ships the patched kwin that registers the outputs.
+# Second displays on the Wayland backend are kwin virtual outputs, which the
+# patched kwin this image ships registers; the interface has to stay visible
+# to Selkies (kwin hides it from clients without an X-KDE-Wayland-Interfaces
+# desktop entry, a check a python process can never satisfy).
 ENV KWIN_WAYLAND_NO_PERMISSION_CHECKS="1"
-ENV SELKIES_KWIN_MULTI="true"

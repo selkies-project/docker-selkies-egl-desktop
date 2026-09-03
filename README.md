@@ -101,7 +101,6 @@ Everything Selkies reads is an environment variable named in [`docs/settings.md`
 | `SELKIES_AUTO_GPU` | `true` | Which GPU the session renders on when the container was given several |
 | `SELKIES_COMMAND_ENABLED` | `true` | The command channel behind the dashboard's apps panel; `false` disables it |
 | `START_PLASMA` | `true` | `false` runs only the display server (and, on the Wayland backend, only kwin) |
-| `SELKIES_KWIN_MULTI` | `true` | Second displays on the Wayland backend as kwin virtual outputs; this image ships the patched kwin they need |
 
 The base container's own variables apply as well: `SELKIES_WAYLAND_COMPOSITOR` names the nested compositor (this image sets it to the Plasma session), `DISABLE_ZINK=true` leaves an NVIDIA GPU to software OpenGL instead of routing it through Zink, and the `SELKIES_TURN_*` variables configure the WebRTC transport.
 
