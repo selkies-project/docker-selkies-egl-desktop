@@ -36,7 +36,7 @@ FROM ${DISTRIB_IMAGE}:${DISTRIB_RELEASE} AS kwinbuild
 ARG DEBIAN_FRONTEND="noninteractive"
 RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries::Delay::Maximum "30";\n' \
         > /etc/apt/apt.conf.d/99-selkies-retries
-COPY patches/ /build/patches/
+COPY patches/kwin/ /build/patches/
 RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get clean && apt-get update && \
     apt-get install --no-install-recommends -y \
@@ -46,6 +46,29 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
     mkdir -p /build/src && cd /build/src && \
     apt-get source kwin && \
     cd kwin-*/ && \
+    for kwin_patch in /build/patches/*.patch; do patch -p1 < "${kwin_patch}"; done && \
+    DEB_BUILD_OPTIONS="nocheck parallel=$(nproc)" \
+        dpkg-buildpackage -b -uc -us && \
+    mkdir -p /build/debs && \
+    mv /build/src/*.deb /build/debs/
+
+# The X11 window manager, rebuilt the same way: stock kwin_x11 makes one screen
+# per CRTC and spans the displays Selkies publishes as RandR monitors over the
+# one CRTC a framebuffer server has, so a maximized window would cover both.
+FROM ${DISTRIB_IMAGE}:${DISTRIB_RELEASE} AS kwinx11build
+ARG DEBIAN_FRONTEND="noninteractive"
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries::Delay::Maximum "30";\n' \
+        > /etc/apt/apt.conf.d/99-selkies-retries
+COPY patches/kwin-x11/ /build/patches/
+RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources && \
+    apt-get clean && apt-get update && \
+    apt-get install --no-install-recommends -y \
+        ca-certificates \
+        dpkg-dev && \
+    apt-get build-dep -y kwin-x11 && \
+    mkdir -p /build/src && cd /build/src && \
+    apt-get source kwin-x11 && \
+    cd kwin-x11-*/ && \
     for kwin_patch in /build/patches/*.patch; do patch -p1 < "${kwin_patch}"; done && \
     DEB_BUILD_OPTIONS="nocheck parallel=$(nproc)" \
         dpkg-buildpackage -b -uc -us && \
@@ -87,13 +110,15 @@ USER 1000
 SHELL ["/usr/bin/fakeroot", "--", "/bin/sh", "-c"]
 
 COPY --from=kwinbuild --chown=1000:1000 /build/debs /tmp/kwin-debs
+COPY --from=kwinx11build --chown=1000:1000 /build/debs /tmp/kwin-x11-debs
 
-# The Plasma desktop, then the patched kwin over the packaged one in the same
-# operation. Both session launchers are installed: startplasma-x11 with kwin_x11
-# for the base's Xvfb, startplasma-wayland with kwin_wayland for the nested
-# session. The dpkg -i takes only the rebuilt debs whose package the install
-# above put on the system (kwin-common, kwin-data, kwin-wayland -- not the
-# debug or development splits), in one invocation so dpkg orders them itself.
+# The Plasma desktop, then the patched kwin and kwin-x11 over the packaged ones
+# in the same operation. Both session launchers are installed: startplasma-x11
+# with kwin_x11 for the base's Xvfb, startplasma-wayland with kwin_wayland for
+# the nested session. The dpkg -i takes only the rebuilt debs whose package the
+# install above put on the system (kwin-common, kwin-data, kwin-wayland,
+# kwin-x11 -- not the debug or development splits), in one invocation so dpkg
+# orders them itself.
 RUN apt-get clean && apt-get update && apt-get install --no-install-recommends -y \
         plasma-desktop \
         plasma-workspace \
@@ -135,7 +160,7 @@ RUN apt-get clean && apt-get update && apt-get install --no-install-recommends -
         # no-op and the cache a session reads predates the application
         gtk-update-icon-cache && \
     debs="" && \
-    for deb in /tmp/kwin-debs/*.deb; do \
+    for deb in /tmp/kwin-debs/*.deb /tmp/kwin-x11-debs/*.deb; do \
         if dpkg -s "$(dpkg-deb -f "${deb}" Package)" > /dev/null 2>&1; then \
             debs="${debs} ${deb}"; \
         fi; \
