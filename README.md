@@ -85,20 +85,20 @@ The file requests an NVIDIA GPU through the NVIDIA device plugin. AMD and Intel 
 
 ### Running with Apptainer
 
-On a cluster without Docker, the image runs under Apptainer as an ordinary user, pulled straight from the registry: this is a SLURM job on a GPU node that keeps the desktop for the job's lifetime, with the port and display number derived from the job id so several sessions can share a node, a private `/tmp` for the session's sockets, and a directory of your own as the desktop's home.
+On a cluster without Docker, the image runs under Apptainer as an ordinary user, pulled straight from the registry: a job on a GPU node keeps the desktop for its lifetime, with a display number and a port that no other session on the node uses (a job id from the scheduler is a good seed for both), a private `/tmp` for the session's sockets, and a directory of your own as the desktop's home.
 
 ```bash
 #!/bin/bash
-#SBATCH --gres=gpu:1
+N=$((RANDOM % 900 + 100))
+PORT=$((RANDOM % 10000 + 20000))
 mkdir -p "$HOME/selkies/home" "$HOME/selkies/tmp"
-export PORT=$((SLURM_JOB_ID % 10000 + 20000))
 apptainer run --nv --writable-tmpfs --contain --cleanenv \
     --home "$HOME/selkies/home:/home/ubuntu" -B "$HOME/selkies/tmp:/tmp" -B /dev/dri \
-    --env "DISPLAY=:$((SLURM_JOB_ID % 900 + 100)),SELKIES_PORT=$PORT,PASSWD=mypasswd" \
+    --env "DISPLAY=:$N,SELKIES_PORT=$PORT,PASSWD=mypasswd" \
     docker://ghcr.io/selkies-project/selkies-egl-desktop:26.04
 ```
 
-Reach it with `ssh -L 8080:<node>:$PORT <login-node>` and open `https://localhost:8080`. The flags are explained in the [Selkies documentation](https://selkies-project.github.io/selkies/start/#apptainer-and-slurm), including the driver's GBM backend the Wayland backend needs bound from the host under `--nv`.
+Reach it with `ssh -L 8080:<node>:$PORT <login-node>` and open `https://localhost:8080`. The flags are explained in the [Selkies documentation](https://selkies-project.github.io/selkies/start/#apptainer), including the driver's GBM backend the Wayland backend needs bound from the host under `--nv`.
 
 ## Configuration
 
