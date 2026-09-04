@@ -31,7 +31,7 @@ Container tags are `26.04` for the current Ubuntu 26.04 build, `latest` for the 
 With an NVIDIA GPU (the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) is required):
 
 ```bash
-docker run --name egl -it -d --gpus 1 --shm-size=2g -e TZ=UTC -e PASSWD=mypasswd -p 8080:8080 ghcr.io/selkies-project/selkies-egl-desktop:26.04
+docker run --name egl -it -d --gpus 1 --runtime nvidia --shm-size=2g -e TZ=UTC -e PASSWD=mypasswd -p 8080:8080 ghcr.io/selkies-project/selkies-egl-desktop:26.04
 ```
 
 With an AMD or Intel GPU, pass the DRM devices in instead. The session user inside the container (uid 1000) must be able to open them, which `--group-add` covers when the host's `render` and `video` groups own the nodes:
