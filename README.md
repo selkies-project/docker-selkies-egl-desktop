@@ -14,7 +14,7 @@ Use [docker-selkies-glx-desktop](https://github.com/selkies-project/docker-selki
 
 ## What is in the image
 
-The [Selkies base container](https://github.com/selkies-project/selkies/blob/main/docs/component.md#desktop-container) supplies everything but the desktop: the display servers (XLibre's Xvfb with glamor and DRI3, and the headless Wayland backend), PipeWire audio, the GPU runtime wiring for NVIDIA, VA-API and Vulkan, the gamepad and webcam plumbing, [s6](https://skarnet.org/software/s6/) service supervision, an embedded [coTURN](https://github.com/coturn/coturn) server for the WebRTC transport, and Selkies itself. This image adds KDE Plasma (`plasma-desktop` with Dolphin, Konsole, KWrite, Gwenview, Ark and System Settings), Firefox and Google Chrome, and the [proot-apps](https://github.com/linuxserver/proot-apps) runner behind the dashboard's apps panel, which installs portable applications into the home directory without touching the image, and Steam behind a bubblewrap stand-in that needs no user namespaces.
+The [Selkies base container](https://github.com/selkies-project/selkies/blob/main/docs/component.md#desktop-container) supplies everything but the desktop: the display servers (XLibre's Xvfb with glamor and DRI3, and the headless Wayland backend), PipeWire audio, the GPU runtime wiring for NVIDIA, VA-API and Vulkan, the gamepad and webcam plumbing, [s6](https://skarnet.org/software/s6/) service supervision, an embedded [coTURN](https://github.com/coturn/coturn) server for the WebRTC transport, and Selkies itself. This image adds KDE Plasma (`plasma-desktop` with Dolphin, Konsole, KWrite, Gwenview, Ark and System Settings), Firefox and Google Chrome, and the [proot-apps](https://github.com/linuxserver/proot-apps) runner behind the dashboard's apps panel, which installs portable applications into the home directory without touching the image, Steam behind a bubblewrap stand-in that needs no user namespaces, Wine Staging with winetricks, VLC, LibreOffice and the KDE application set.
 
 On the Wayland backend a second display is a kwin virtual output, which the distribution's kwin never registers on its nested backend, so the image rebuilds `kwin-wayland` from the Ubuntu source package with the patch under [`patches/`](patches/). The rebuilt packages are the archive's exact version, which is why the image is Ubuntu 26.04 only.
 
@@ -136,6 +136,10 @@ The dashboard's apps panel installs applications from the [proot-apps](https://g
 ### Steam
 
 Steam is installed on x86, and starts from the application menu or `steam` like anywhere else. The client containerizes its browser helper and every game with [bubblewrap](https://github.com/containers/bubblewrap), which needs a user namespace this container does not have, so [selkies-bwrap](https://github.com/selkies-project/selkies-bwrap) stands in for it behind Steam's own launcher. The [Steam Linux Runtime](https://gitlab.steamos.cloud/steamrt) is used exactly as Valve ships it, so native Linux games get the libraries they were built against and Proton runs through the runtime it asks for; enable Steam Play for all titles under `Steam > Settings > Compatibility` to pick a Proton version. Games and Proton prefixes live in the home directory, so mount a volume at `/home/ubuntu` to keep them.
+
+### Wine
+
+Wine Staging is installed on x86 from [WineHQ's own repository](https://wiki.winehq.org/Ubuntu), with `winetricks`. A Windows application runs under it directly, and the prefix lives in the home directory like everything else. Steam's own Windows games go through Proton instead, which the Steam section above covers.
 
 ## WebRTC and Firewall Issues
 
