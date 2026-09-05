@@ -98,7 +98,7 @@ apptainer run --nv --writable-tmpfs --contain --cleanenv \
     docker://ghcr.io/selkies-project/selkies-egl-desktop:26.04
 ```
 
-Reach it with `ssh -L 8080:<node>:$PORT <login-node>` and open `https://localhost:8080`. The flags are explained in the [Selkies documentation](https://selkies-project.github.io/selkies/start/#apptainer), including the driver's GBM backend the Wayland backend needs bound from the host under `--nv`.
+Reach it with `ssh -L 8080:<node>:$PORT <login-node>` and open `https://localhost:8080`. The flags are explained in the [Selkies documentation](https://selkies-project.github.io/selkies/start/#apptainer), including how to tell whether the Apptainer's `--nv` binds the driver's GBM backend, which the Wayland backend draws through, and the two binds from the host that stand in for it when it does not.
 
 ## Configuration
 
