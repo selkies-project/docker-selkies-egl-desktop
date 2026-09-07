@@ -57,7 +57,7 @@ docker compose down
 
 The container serves HTTPS by default on a certificate it mints per install, so the browser warns once until you trust it or name a real certificate with `-e SELKIES_HTTPS_CERT=` and `-e SELKIES_HTTPS_KEY=`; `-e SELKIES_ENABLE_HTTPS=false` serves plain HTTP for a deployment that terminates TLS in front of the container.
 
-The login is `ubuntu` with the password from `PASSWD` (which is also the container's Linux user password) unless `SELKIES_BASIC_AUTH_USER` and `SELKIES_BASIC_AUTH_PASSWORD` name another one. The image ships no password of its own, so one of them has to be given.
+The login is `ubuntu` with the password from `PASSWD` (which is also the container's Linux user password) unless `SELKIES_BASIC_AUTH_USER` and `SELKIES_BASIC_AUTH_PASSWORD` name another one.
 
 **3. If the desktop loads but does not stream, or streams very slowly, read [WebRTC and Firewall Issues](#webrtc-and-firewall-issues).** The default WebSocket transport needs nothing but the web port. The WebRTC transport (`-e SELKIES_MODE=webrtc`) needs a TURN server or host networking, because you are self-hosting WebRTC.
 
@@ -106,7 +106,7 @@ Everything Selkies reads is an environment variable named in [`docs/settings.md`
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `PASSWD` | none | Password of the container's Linux user, and of the web login unless `SELKIES_BASIC_AUTH_PASSWORD` is set; the container stops with a message when the login has no password at all |
+| `PASSWD` | `mypasswd` | Password of the container's Linux user, and of the web login unless `SELKIES_BASIC_AUTH_PASSWORD` is set |
 | `TZ` | `UTC` | Time zone |
 | `SELKIES_WAYLAND` | `false` | Run the desktop on the headless Wayland backend (nested kwin) instead of the X11 framebuffer server |
 | `SELKIES_MODE` | `websockets` | Transport: `websockets` or `webrtc`; both can be switched from the web interface |
