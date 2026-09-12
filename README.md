@@ -207,7 +207,7 @@ Build on it the way [`docs/development.md`](https://github.com/selkies-project/s
 ## Building
 
 ```bash
-docker build -t selkies-egl-desktop --build-arg BASE_IMAGE=ghcr.io/selkies-project/selkies/base:main-ubuntu26.04 .
+docker build -t selkies-egl-desktop --build-arg BASE_IMAGE=ghcr.io/selkies-project/selkies/base:latest-ubuntu26.04 .
 ```
 
 `BASE_IMAGE` is any Ubuntu 26.04 Selkies base container, by tag or digest. The build rebuilds `kwin-wayland` from the archive source with the patch under `patches/`, which takes a while; `SELKIES_REF` names the Selkies revision the shared helper scripts are taken from (`main`).

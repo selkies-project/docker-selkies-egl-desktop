@@ -21,7 +21,7 @@
 # packages are the archive's exact version, so this image is Ubuntu 26.04
 # only and the base it is built on must be the Ubuntu one.
 
-ARG BASE_IMAGE="ghcr.io/selkies-project/selkies/base:main-ubuntu26.04"
+ARG BASE_IMAGE="ghcr.io/selkies-project/selkies/base:latest-ubuntu26.04"
 ARG DISTRIB_IMAGE="ubuntu"
 ARG DISTRIB_RELEASE="26.04"
 # The Selkies revision the shared helper scripts are taken from
