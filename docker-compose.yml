@@ -49,9 +49,9 @@ services:
     # Transport: the WebSocket default needs nothing but the web port; `webrtc`
     # needs the TURN or host-networking arrangements below
 #    - SELKIES_MODE=webrtc
-    # Run the same desktop on the headless Wayland backend (nested kwin) instead
-    # of the X11 framebuffer server
-#    - SELKIES_WAYLAND=true
+    # `true` runs the same desktop on the headless Wayland backend (nested kwin)
+    # instead of the X11 framebuffer server
+    - SELKIES_WAYLAND=false
     # The web login, on by default: `ubuntu` and PASSWD unless set here
     - SELKIES_ENABLE_BASIC_AUTH=true
 #    - SELKIES_BASIC_AUTH_USER=ubuntu
