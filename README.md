@@ -110,14 +110,13 @@ Everything Selkies reads is an environment variable named in [`docs/settings.md`
 | `TZ` | `UTC` | Time zone |
 | `SELKIES_WAYLAND` | `false` | Run the desktop on the headless Wayland backend (nested kwin) instead of the X11 framebuffer server |
 | `SELKIES_MODE` | `websockets` | Transport: `websockets` or `webrtc`; both can be switched from the web interface |
-| `SELKIES_ENCODER` | `h264enc` | Video encoder: `h264enc` (hardware NVENC or VA-API when the GPU has it, x264 otherwise), `h264enc-striped`, or `jpeg` |
-| `SELKIES_VIDEO_BITRATE`, `SELKIES_FRAMERATE`, `SELKIES_AUDIO_BITRATE` | `8000`, `60`, `128000` | Initial stream parameters, adjustable from the web interface |
 | `SELKIES_ENABLE_HTTPS` | `true` | Serve TLS; `SELKIES_HTTPS_CERT` and `SELKIES_HTTPS_KEY` name a real certificate |
 | `SELKIES_ENABLE_BASIC_AUTH` | `true` | The web login, `ubuntu` and `PASSWD` unless `SELKIES_BASIC_AUTH_USER` and `SELKIES_BASIC_AUTH_PASSWORD` are set |
-| `SELKIES_SCALING_DPI` | `96` | The desktop's DPI, also adjustable from the web interface |
 | `SELKIES_AUTO_GPU` | `true` | Which GPU the session renders on when the container was given several |
 | `SELKIES_COMMAND_ENABLED` | `true` | The command channel behind the dashboard's apps panel; `false` disables it |
 | `START_PLASMA` | `true` | `false` runs the display server with kwin alone, no Plasma shell: a single application started from the apps panel or an attached shell is managed, resized and maximized without a desktop around it |
+
+The video encoder, the video and audio bitrates, the frame rate and the UI scaling are chosen from the web interface and are not set in the environment; a single value in `SELKIES_ENCODER` or `SELKIES_SCALING_DPI` locks that choice.
 
 The base container's own variables apply as well: `SELKIES_WAYLAND_COMPOSITOR` names the nested compositor (this image sets it to the Plasma session), `DISABLE_ZINK=true` leaves an NVIDIA GPU to software OpenGL instead of routing it through Zink, and the `SELKIES_TURN_*` variables configure the WebRTC transport.
 
