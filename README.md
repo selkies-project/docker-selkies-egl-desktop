@@ -28,7 +28,7 @@ Container tags are `26.04` for the current Ubuntu 26.04 build, `latest` for the 
 
 **1. Run the container with Docker or Podman.**
 
-With an NVIDIA GPU (the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) is required):
+With an NVIDIA GPU (the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) v1.20.1 or higher is required):
 
 ```bash
 docker run --name egl -it -d --gpus 1 --runtime nvidia --shm-size=2g -e TZ=UTC -e PASSWD=mypasswd -p 8080:8080 ghcr.io/selkies-project/selkies-egl-desktop:26.04
@@ -159,7 +159,7 @@ Self-hosted WebRTC needs a [TURN server](https://github.com/selkies-project/selk
 <details markdown>
   <summary>Open Answer</summary>
 
-Check that the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) is configured on the host and the container was started with `--gpus`, that the host driver is not the `nvidia-headless` variant (it lacks the graphics libraries), and that `NVIDIA_DRIVER_CAPABILITIES` inside the container is `all` or includes `graphics` (OpenGL, Vulkan), `video` (NVENC) and `compute`. Vulkan needs `display` as well. `nvidia-smi` and `vulkaninfo --summary` inside the container show what the driver exposes; the container's log names the GPU the session renders on and why it fell back if it did.
+Check that the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), v1.20.1 or higher, is configured on the host and the container was started with `--gpus`, that the host driver is not the `nvidia-headless` variant (it lacks the graphics libraries), and that `NVIDIA_DRIVER_CAPABILITIES` inside the container is `all` or includes `graphics` (OpenGL, Vulkan), `video` (NVENC) and `compute`. Vulkan needs `display` as well. `nvidia-smi` and `vulkaninfo --summary` inside the container show what the driver exposes; the container's log names the GPU the session renders on and why it fell back if it did.
 
 </details>
 
@@ -186,7 +186,7 @@ Give the container more shared memory: `--shm-size=2g`, or the `/dev/shm` memory
 <details markdown>
   <summary>Open Answer</summary>
 
-`glxinfo -B` and `vulkaninfo --summary` inside the session show which driver answers. On NVIDIA GPUs GLX and EGL answer with the driver's own libraries over the display server's DRI3, the EGL ones through the driver's X11 platform libraries the image carries; Mesa reaches the GPU through Zink on the Vulkan driver. An application that needs the NVIDIA X server module itself belongs on [docker-selkies-glx-desktop](https://github.com/selkies-project/docker-selkies-glx-desktop). `DISABLE_ZINK=true` keeps Zink out of the session: EGL then falls to software OpenGL, and GLX keeps the driver's library where the server has DRI3. Zink, and every Vulkan application, presents only where the container has the driver's modeset node, `/dev/nvidia-modeset`; a runtime that withholds it leaves EGL to software rendering, which the container log reports. A host whose `nvidia-drm` module runs with modesetting off gives the driver no working GBM: the log then calls the GPU unusable, the Wayland backend falls back to X11, the framebuffer server stays in software, and OpenGL runs through Zink.
+`glxinfo -B` and `vulkaninfo --summary` inside the session show which driver answers. On NVIDIA GPUs GLX and EGL answer with the driver's own libraries over the display server's DRI3, the EGL ones through the driver's X11 platform libraries the image carries; Mesa reaches the GPU through Zink on the Vulkan driver. An application that needs the NVIDIA X server module itself belongs on [docker-selkies-glx-desktop](https://github.com/selkies-project/docker-selkies-glx-desktop). `DISABLE_ZINK=true` keeps Zink out of the session: EGL then falls to software OpenGL, and GLX keeps the driver's library where the server has DRI3. Zink, and every Vulkan application, presents only with the driver's modeset node, `/dev/nvidia-modeset`, which the toolkit passes in under the `display` capability; without it EGL is left to software rendering, which the container log reports. A host whose `nvidia-drm` module runs with modesetting off gives the driver no working GBM: the log then calls the GPU unusable, the Wayland backend falls back to X11, the framebuffer server stays in software, and OpenGL runs through Zink.
 
 </details>
 
