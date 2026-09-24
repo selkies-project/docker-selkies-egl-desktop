@@ -7,7 +7,7 @@
 #
 # The base is the whole session apart from what it looks like -- the X11
 # framebuffer server and the headless Wayland backend, audio, GPU wiring, s6,
-# coTURN and Selkies itself. This layer adds only the desktop: Plasma on the
+# coTURN, and Selkies itself. This layer adds only the desktop: Plasma on the
 # base's Xvfb by default and natively on a nested kwin_wayland under
 # SELKIES_WAYLAND=true, the browsers, and the proot-apps runner behind the
 # dashboards' apps panel. The GPU is reached the way the base reaches it, through
@@ -92,7 +92,7 @@ ARG PROOT_BWRAP_REF
 # The base ships its setuid and setgid files owned by root, and dpkg replaces a
 # file by hardlinking the old one aside first -- which the kernel denies uid
 # 1000 on a setuid file it does not own. Released for the layers below, an
-# archive update to util-linux, shadow, sudo, fuse3 or dbus is just another
+# archive update to util-linux, shadow, sudo, fuse3, or dbus is just another
 # package; without this it fails the layer that takes it. The helper is the
 # base's own; a base published before it carried one is given the copy the
 # Selkies repository ships.
@@ -145,7 +145,7 @@ RUN apt-get clean && apt-get update && apt-get install --no-install-recommends -
         systemsettings \
         # The applications a desktop is unusable without: file manager,
         # terminal, editor, image viewer, archiver, dialogs for scripts, the
-        # volume applet the panel loads and the system monitor it links to
+        # volume applet the panel loads, and the system monitor it links to
         dolphin \
         konsole \
         kwrite \
@@ -177,7 +177,7 @@ RUN apt-get clean && apt-get update && apt-get install --no-install-recommends -
 
 # Session defaults in the system scope, so a user's own settings still win:
 # no splash on a streamed desktop, no lock screen (a locked container session
-# has no local seat to unlock it) and no leave actions (logging out ends the
+# has no local seat to unlock it), and no leave actions (logging out ends the
 # session the stream is showing, and shutdown addresses an init this container
 # does not run), no compositing on the X11 session (every animation is
 # bandwidth for nothing, and the framebuffer server renders it in software),
@@ -245,7 +245,7 @@ RUN mkdir -pm755 /opt/proot-apps && \
     chmod -f 755 /usr/local/bin/selkies-proot
 
 # Steam, and the games it launches, in a container without user namespaces.
-# The client runs its browser helper, its compatibility tools and every game
+# The client runs its browser helper, its compatibility tools, and every game
 # through pressure-vessel, which builds a container with bubblewrap; bubblewrap
 # needs a user namespace or CAP_SYS_ADMIN and a container's seccomp profile
 # grants neither, so a stock Steam stops at its own requirements check with
