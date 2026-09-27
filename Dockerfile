@@ -193,9 +193,9 @@ RUN mkdir -pm755 /etc/xdg && \
     printf '[Compositing]\nEnabled=false\n' > /etc/xdg/kwinrc && \
     printf '[Basic Settings]\nIndexing-Enabled=false\n' > /etc/xdg/baloofilerc && \
     # Plasma's device notifier and Dolphin's places poll UDisks2, which the
-    # session bus cannot activate here (a container mounts nothing) and would
-    # otherwise retry, and log, on every query; without the activation file
-    # the service is simply absent
+    # system bus cannot activate here (a container mounts nothing); without
+    # the activation file the service is simply absent, and Solid is told
+    # not to ask for it (SOLID_DISABLE_UDISKS2 below)
     rm -f /usr/share/dbus-1/system-services/org.freedesktop.UDisks2.service
 
 # The browsers, in one apt operation: Firefox from Mozilla's own APT repository,
@@ -435,6 +435,9 @@ ENV START_PLASMA="true"
 ENV SELKIES_WAYLAND_COMPOSITOR="selkies-kwin"
 # Plasma's menu definitions carry its prefix; the base defaults to lxqt-
 ENV XDG_MENU_PREFIX="plasma-"
+# Solid's UDisks2 backend would ask for the absent service at every device
+# query and log the refusal each time, so it is left out.
+ENV SOLID_DISABLE_UDISKS2="1"
 # Second displays on the Wayland backend are kwin virtual outputs, which the
 # patched kwin this image ships registers; the interface has to stay visible
 # to Selkies (kwin hides it from clients without an X-KDE-Wayland-Interfaces
