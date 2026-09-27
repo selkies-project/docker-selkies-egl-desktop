@@ -106,6 +106,7 @@ Everything Selkies reads is an environment variable named in [`docs/settings.md`
 | --- | --- | --- |
 | `PASSWD` | `mypasswd` | Password of the container's Linux user, and of the web login unless `SELKIES_BASIC_AUTH_PASSWORD` is set |
 | `TZ` | `UTC` | Time zone |
+| `DISPLAY_SIZEW`, `DISPLAY_SIZEH` | `1920`, `1080` | The size the X11 desktop has until a client connects and replaces it with its own (dynamic resizing is on by default); the size a manual resolution locks the stream to (`SELKIES_MANUAL_WIDTH`, `SELKIES_MANUAL_HEIGHT`, `SELKIES_MANUAL_RESOLUTION`) takes its place where set, read as Selkies reads it |
 | `SELKIES_WAYLAND` | `false` | Run the desktop on the headless Wayland backend (nested kwin) instead of the X11 framebuffer server |
 | `SELKIES_MODE` | `websockets` | Transport: `websockets` or `webrtc`; both can be switched from the web interface |
 | `SELKIES_ENABLE_HTTPS` | `true` | Serve TLS; `SELKIES_HTTPS_CERT` and `SELKIES_HTTPS_KEY` name a real certificate |

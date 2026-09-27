@@ -52,6 +52,13 @@ services:
     # `true` runs the same desktop on the headless Wayland backend (nested kwin)
     # instead of the X11 framebuffer server
     - SELKIES_WAYLAND=false
+    # The size the X11 desktop has until a client connects and replaces it with
+    # its own (dynamic resizing is on by default); the size a manual resolution
+    # locks the stream to takes its place where set, read as Selkies reads it
+#    - DISPLAY_SIZEW=1920
+#    - DISPLAY_SIZEH=1080
+#    - SELKIES_MANUAL_WIDTH=1920
+#    - SELKIES_MANUAL_HEIGHT=1080
     # The web login, on by default: `ubuntu` and PASSWD unless set here
     - SELKIES_ENABLE_BASIC_AUTH=true
 #    - SELKIES_BASIC_AUTH_USER=ubuntu
