@@ -6,10 +6,7 @@ Plasma runs on the base's X11 framebuffer server by default, and natively on the
 
 Use [docker-selkies-glx-desktop](https://github.com/selkies-project/docker-selkies-glx-desktop) for the same desktop on an X.Org server that owns the GPU, which is what an application that needs the vendor's own GLX stack, or the last bit of OpenGL performance, wants; that image gives one GPU to one container.
 
-[![Build](https://github.com/selkies-project/docker-selkies-egl-desktop/actions/workflows/container-publish.yml/badge.svg)](https://github.com/selkies-project/docker-selkies-egl-desktop/actions/workflows/container-publish.yml)
-
-[![Discord](https://img.shields.io/badge/dynamic/json?logo=discord&label=Discord%20Members&query=approximate_member_count&url=https%3A%2F%2Fdiscordapp.com%2Fapi%2Finvites%2FwDNGDeSW5F%3Fwith_counts%3Dtrue)](https://discord.gg/wDNGDeSW5F)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/selkies-project/docker-selkies-egl-desktop)
+[![Build](https://github.com/selkies-project/docker-selkies-egl-desktop/actions/workflows/container-publish.yml/badge.svg)](https://github.com/selkies-project/docker-selkies-egl-desktop/actions/workflows/container-publish.yml) [![Discord](https://img.shields.io/badge/dynamic/json?logo=discord&label=Discord%20Members&query=approximate_member_count&url=https%3A%2F%2Fdiscordapp.com%2Fapi%2Finvites%2FwDNGDeSW5F%3Fwith_counts%3Dtrue)](https://discord.gg/wDNGDeSW5F) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/selkies-project/docker-selkies-egl-desktop)
 
 **Please read [Troubleshooting](#troubleshooting) first, then use [Discord](https://discord.gg/wDNGDeSW5F) or [GitHub Discussions](https://github.com/selkies-project/docker-selkies-egl-desktop/discussions) for support questions. Please only use [Issues](https://github.com/selkies-project/docker-selkies-egl-desktop/issues) for technical inquiries or bug reports.**
 
