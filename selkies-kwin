@@ -26,12 +26,18 @@ until [ -S "${XDG_RUNTIME_DIR}/selkies-session-bus" ]; do sleep 0.5; done
 # without it XWayland fails outright and every X11 application is lost. /tmp
 # is sticky, so the session user can create it; the setuid helper covers a
 # /tmp that something else already restricted.
-if [ ! -d /tmp/.X11-unix ]; then
-  # shellcheck disable=SC2174  # /tmp always exists, so -m applies to the leaf
-  mkdir -pm1777 /tmp/.X11-unix 2>/dev/null || sudo-root mkdir -pm1777 /tmp/.X11-unix \
-    || echo "[selkies-kwin] could not create /tmp/.X11-unix; X11 applications will not work"
+# A symlink there, which another account can plant in a /tmp shared with the
+# host, would carry the mode below to whatever directory it names.
+if [ -L /tmp/.X11-unix ]; then
+  echo "[selkies-kwin] /tmp/.X11-unix is a symlink; X11 applications will not work"
+else
+  if [ ! -d /tmp/.X11-unix ]; then
+    # shellcheck disable=SC2174  # /tmp always exists, so -m applies to the leaf
+    mkdir -pm1777 /tmp/.X11-unix 2>/dev/null || sudo-root mkdir -pm1777 /tmp/.X11-unix \
+      || echo "[selkies-kwin] could not create /tmp/.X11-unix; X11 applications will not work"
+  fi
+  chmod 1777 /tmp/.X11-unix 2>/dev/null || true
 fi
-chmod 1777 /tmp/.X11-unix 2>/dev/null || true
 
 # Canonicalized the way the base entrypoint reads its toggles: the field before
 # any |suffix, "true" or "1" in any case.
