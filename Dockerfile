@@ -36,6 +36,9 @@ ARG PROOT_BWRAP_REF="main"
 # also the version the desktop layer below installs.
 FROM ${DISTRIB_IMAGE}:${DISTRIB_RELEASE} AS kwinbuild
 ARG DEBIAN_FRONTEND="noninteractive"
+# The archive's kwin source version, which CI reads before the build: a new one
+# rebuilds this stage where a build cache would hand back the last one's packages
+ARG KWIN_VERSION=""
 RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries::Delay::Maximum "30";\n' \
         > /etc/apt/apt.conf.d/99-selkies-retries
 COPY patches/kwin/ /build/patches/
@@ -46,6 +49,7 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
         dpkg-dev && \
     apt-get build-dep -y kwin && \
     mkdir -p /build/src && cd /build/src && \
+    echo "kwin ${KWIN_VERSION:-as the archive serves}" && \
     apt-get source kwin && \
     cd kwin-*/ && \
     for kwin_patch in /build/patches/*.patch; do patch -p1 < "${kwin_patch}"; done && \
@@ -59,6 +63,9 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
 # one CRTC a framebuffer server has, so a maximized window would cover both.
 FROM ${DISTRIB_IMAGE}:${DISTRIB_RELEASE} AS kwinx11build
 ARG DEBIAN_FRONTEND="noninteractive"
+# The archive's kwin-x11 source version, which CI reads before the build: a new one
+# rebuilds this stage where a build cache would hand back the last one's packages
+ARG KWIN_X11_VERSION=""
 RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries::Delay::Maximum "30";\n' \
         > /etc/apt/apt.conf.d/99-selkies-retries
 COPY patches/kwin-x11/ /build/patches/
@@ -69,6 +76,7 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
         dpkg-dev && \
     apt-get build-dep -y kwin-x11 && \
     mkdir -p /build/src && cd /build/src && \
+    echo "kwin-x11 ${KWIN_X11_VERSION:-as the archive serves}" && \
     apt-get source kwin-x11 && \
     cd kwin-x11-*/ && \
     for kwin_patch in /build/patches/*.patch; do patch -p1 < "${kwin_patch}"; done && \
