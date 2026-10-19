@@ -23,7 +23,7 @@ never consuming the PipeWire stream.
    honestly failed stream, and the GL-dependent recording machinery still
    never runs where it cannot.
 
-Applies to kwin 6.6.x (verified against v6.6.6).
+Applies to kwin 6.6.x and 6.7.x (verified against v6.6.6 and v6.7.5).
 
 --- a/src/plugins/screencast/screencastmanager.cpp
 +++ b/src/plugins/screencast/screencastmanager.cpp
