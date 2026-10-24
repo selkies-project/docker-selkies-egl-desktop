@@ -1,6 +1,6 @@
 <h1 align="center">docker-selkies-egl-desktop</h1>
 
-<p align="center">Part of <a href="https://www.linuxserver.io"><img src="https://raw.githubusercontent.com/selkies-project/docker-selkies-egl-desktop/main/assets/linuxserver.svg" alt="LinuxServer.io" title="LinuxServer.io" width="200" align="middle"></a></p>
+<p align="center">Part of <a href="https://www.linuxserver.io"><img src="https://raw.githubusercontent.com/selkies-project/docker-selkies-egl-desktop/main/assets/linuxserver.svg" alt="LinuxServer.io" title="LinuxServer.io" width="182" align="middle"></a></p>
 
 KDE Plasma desktop container for [Selkies](https://github.com/selkies-project/selkies), built on the [Selkies base container](https://github.com/selkies-project/selkies/tree/main/addons/base): a complete remote desktop streamed over WebSockets or WebRTC to a browser, with hardware acceleration on NVIDIA, AMD, and Intel GPUs and a software fallback without one. The GPU is reached the way the base reaches it, through EGL and DRI3 with no X.Org server of its own, so one GPU can serve as many of these containers as it has memory for and no `/tmp/.X11-unix` host socket or host configuration is involved.
 
