@@ -39,6 +39,15 @@ else
   chmod 1777 /tmp/.X11-unix 2>/dev/null || true
 fi
 
+# The base composites in software where the GPU the container sees cannot serve
+# the compositor (SELKIES_WAYLAND_RENDERER=pixman), and leaves a nested
+# compositor's own switch to the image: kwin's renderer would allocate on that
+# node and leave its outputs empty, so kwin composites with QPainter then too,
+# unless the deployment names its own KWIN_COMPOSE.
+if [ "${SELKIES_WAYLAND_RENDERER:-}" = "pixman" ]; then
+  export KWIN_COMPOSE="${KWIN_COMPOSE:-Q}"
+fi
+
 # Canonicalized the way the base entrypoint reads its toggles: the field before
 # any |suffix, "true" or "1" in any case.
 start_plasma="${START_PLASMA%%|*}"
